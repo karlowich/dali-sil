@@ -4,7 +4,7 @@ FROM ${FROM_IMAGE_NAME}
 # Install xallib (xfs*) and BaM (cmake, linux-headers) dependencies
 RUN echo deb http://archive.ubuntu.com/ubuntu/ focal-updates main restricted >> /etc/apt/sources.list
 RUN apt-get update
-RUN apt-get -y install cmake linux-headers-$(uname -r) xfsprogs xfslibs-dev
+RUN apt-get -y install cmake linux-headers-$(uname -r) xfsprogs xfslibs-dev gcc-12
 
 # Install BaM
 RUN git clone https://github.com/ankit-sam/bam.git
