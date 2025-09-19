@@ -2,6 +2,7 @@ import sys
 import time
 
 import argparse
+import torch
 import numpy as np 
 import cupy as cp
 from nvidia.dali import pipeline_def, Pipeline
@@ -25,6 +26,7 @@ def dali_pipe(data_dir):
 
     return jpegs.gpu(), labels
 
+
 class SILInputIterator(object):
     def __init__(self, device, data_dir, batch_size, backend, mnt="", gpu_nqueues=6, queue_depth=1024):
         self.n = sil.init(device, data_dir = data_dir, backend = backend, batch_size = batch_size, gpu_nqueues = gpu_nqueues, queue_depth = queue_depth, mnt = mnt)
@@ -39,12 +41,12 @@ class SILInputIterator(object):
             self.__iter__()
             raise StopIteration
 
-        labels = np.zeros((self.batch_size,), dtype = np.int32)
         batch = []
-        arr = sil.next()
+        labels = []
+        arr, lab = sil.next()
         for i in range(len(arr)):
             batch.append(cp.ndarray(shape=arr[i].shape, dtype=arr[i].dtype, memptr=cp.cuda.MemoryPointer(cp.cuda.UnownedMemory(arr[i].ctypes.data, len(arr[i]), self), 0)))
-
+            labels.append(torch.tensor([lab[i]], dtype=torch.int32))
         self.i += self.batch_size
         
         return batch, labels
@@ -57,6 +59,7 @@ class SILInputIterator(object):
 
     next = __next__
 
+
 @pipeline_def
 def aisio_pipe(data_dir):
     pipe = Pipeline.current()
@@ -67,8 +70,6 @@ def aisio_pipe(data_dir):
     )
     
     return jpegs, labels
-
-
 
 
 def setup():
@@ -98,7 +99,6 @@ def setup():
 
 
 def main():    
-
     args = setup()
     pipe = None
     if args.dataloader == "dali":
@@ -130,8 +130,10 @@ def main():
 
     mean_start = time.time()
     start = time.time()
+    iterations = 0
     n = 0
     for i in range(batches):
+        iterations+=1
         try:
             jpegs, _ = pipe.run()
         except StopIteration:
@@ -145,8 +147,9 @@ def main():
 
     mean_end = time.time()
     print(f"Running Time: {mean_end - mean_start}") 
-    print(f"Mean img/s: {(args.batchsize*batches)/(mean_end - mean_start)}") 
+    print(f"Mean img/s: {(args.batchsize*iterations)/(mean_end - mean_start)}")
     exit(0)
+
 
 if __name__ == "__main__":
     sys.exit(main())    
